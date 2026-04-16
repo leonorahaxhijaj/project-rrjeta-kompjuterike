@@ -34,6 +34,37 @@ int main(){
                             ifstream f(arg1);
                             if (f) { stringstream s; s << f.rdbuf(); response = s.str(); }
                             else response = "File nuk u gjet.";
+                        } else if (cmd == "/upload") {
+                            ofstream f(arg1); f << arg2; response = "SUKSES: File u ngarkua.";
+                        
+                        } else if (cmd == "/delete") {
+                           response = (remove(arg1.c_str()) == 0) ? "SUKSES: File u fshi." : "GABIM: Fshirja deshtoi.";
+                        
+                        } else if (cmd == "/download") {
+                            ifstream file(arg1); 
+                            if (file) {
+                                stringstream buffer;
+                                buffer << file.rdbuf(); 
+                            } else {
+                                response = "GABIM: Skedari nuk ekziston ne Server.";
+                                    }
+                        } else if (cmd == "/search") {
+                            string keyword = arg1; 
+                            response = "";
+                                    
+                            for (const auto& entry : std::filesystem::directory_iterator(".")) {
+                                string filename = entry.path().filename().string();
+                                        
+                                if (filename.find(keyword) != string::npos) {
+                                    response += filename + " | ";
+                                }
+                            }
+                                    
+                            if (response == "") {
+                                response = "Nuk u gjet asnje file qe permban: " + keyword;
+                            } else {
+                                response = "Rezultatet e kerkimit: " + response;
+                            }
                         }
     }
     return 0;
