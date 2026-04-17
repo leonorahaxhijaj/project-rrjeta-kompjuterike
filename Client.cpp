@@ -23,6 +23,19 @@ int main() {
 
     cout << "U lidhet me Serverin!" << endl;
 
+    string line;
+    while (true) {
+        cout << "Komanda: ";
+        getline(cin, line);
+        if (line == "exit") break;
+
+        send(sock, line.c_str(), (int)line.length(), 0);
+
+        char buf[4096] = {0};
+        int r = recv(sock, buf, 4096, 0);
+        if (r > 0) cout << "Serveri: " << buf << endl;
+    }
+
     closesocket(sock);
     WSACleanup();
     return 0;
