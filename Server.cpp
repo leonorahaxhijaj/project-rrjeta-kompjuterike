@@ -13,26 +13,35 @@
 #include <sys/stat.h>
 
 // HTTP setup
- if (FD_ISSET(main_socket, &read_fds)) {
-            sockaddr_in addr; 
-            int len = sizeof(addr);
-            SOCKET new_sock = accept(main_socket, (struct sockaddr*)&addr, &len);
+ // Check if there is an incoming HTTP request
+if (FD_ISSET(http_socket, &read_fds))
+    handleHttpRequest(http_socket);
 
-            if (clients.size() >= (size_t)max_clients) {
-                string m = "Serveri plot!\n";
-                send(new_sock, m.c_str(), m.length(), 0);
-                closesocket(new_sock);
-            } else {
-                char ip[INET_ADDRSTRLEN];
-                inet_ntop(AF_INET, &addr.sin_addr, ip, INET_ADDRSTRLEN);
-                clients[new_sock] = {new_sock, string(ip), time(0), 0};
-               
-                if (admin_client == INVALID_SOCKET) {
-                    admin_client = new_sock;
-                    cout << "[SISTEMI] Admin i ri: " << ip << endl;
-                } else {
-                    cout << "[SISTEMI] User i ri (Read-Only): " << ip << endl;
-                }
-            }
+// Iterate through all connected clients
+for (auto it = clients.begin(); it != clients.end(); ) {
+    SOCKET id = it->first;
+
+    // Check if this client has sent data
+    if (FD_ISSET(id, &read_fds)) {
+        char buf[4096] = {0};
+
+        // Receive data from client
+        int r = recv(id, buf, 4096, 0);
+
+        // If connection is closed or error occurred
+        if (r <= 0) {
+            cout << "U shkeput: " << it->second.ip << endl;
+
+            // If admin disconnected, reset admin socket
+            if (admin_client == id)
+                admin_client = INVALID_SOCKET;
+
+            // Close socket and remove client from map
+            closesocket(id);
+            it = clients.erase(it);
+            continue;
         }
 
+        // If client is NOT admin, apply delay (rate limiting / anti-spam)
+        if (id != admin_client)
+            Sleep(1500);
