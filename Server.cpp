@@ -51,7 +51,30 @@ string get_time_now() {
 void handleHttpRequest(SOCKET http_socket);
 
 int main(){
+//leonis-pjesa 2
 
+    WSADATA data; 
+    WSAStartup(MAKEWORD(2, 2), &data); 
+
+    SOCKET main_socket = socket(AF_INET, SOCK_STREAM, 0); 
+    sockaddr_in main_addr; 
+    main_addr.sin_family = AF_INET; 
+    main_addr.sin_addr.s_addr = INADDR_ANY; 
+    main_addr.sin_port = htons(tcp_port); 
+    bind(main_socket, (struct sockaddr*)&main_addr, sizeof(main_addr)); 
+    
+    listen(main_socket, max_clients);
+
+    SOCKET http_socket = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in http_addr;
+    http_addr.sin_family = AF_INET;
+    http_addr.sin_addr.s_addr = INADDR_ANY;
+    http_addr.sin_port = htons(http_port); 
+    bind(http_socket, (struct sockaddr*)&http_addr, sizeof(http_addr));
+    listen(http_socket, 5);
+
+    cout << "SERVERI NE PUNE..." << endl;
+    cout << "TCP Port: " << tcp_port << " | HTTP Port: " << http_port << endl;
 
     if (!is_admin && (cmd == "/upload" || cmd == "/delete" || cmd == "/download")) {
                         response = "GABIM: Ju nuk jeni Admin! Keni vetem read() permission.";
