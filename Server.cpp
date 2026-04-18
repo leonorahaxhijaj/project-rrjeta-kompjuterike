@@ -14,9 +14,77 @@
 
 #pragma comment(lib, "ws2_32.lib") 
 using namespace std;
+const string server_ipAddres = "172.16.108.31"; 
+int tcp_port = 7777; 
+
+int http_port = 8080; 
+int max_clients = 6;  
+int timeout_seconds = 300; 
+
+struct Client {
+    SOCKET socket;
+    string ip;
+    time_t last_seen;
+    int requests;
+};
+
+struct MessageLog {
+    string ip;
+    string msg;
+    string time_str;
+};
+
+map<SOCKET, Client> clients;
+vector<MessageLog> messages_log; 
+SOCKET admin_client = INVALID_SOCKET; 
+
+string get_time_now() {
+    time_t now = time(0);
+    struct tm tstruct;
+    char buf[80];
+    localtime_s(&tstruct, &now);
+    strftime(buf, sizeof(buf), "%H:%M:%S", &tstruct);
+    return string(buf);
+}
+
+void handleHttpRequest(SOCKET http_socket);
 
 int main(){
 
+    WSADATA data; 
+    WSAStartup(MAKEWORD(2, 2), &data); 
+
+    SOCKET main_socket = socket(AF_INET, SOCK_STREAM, 0); 
+    sockaddr_in main_addr; 
+    main_addr.sin_family = AF_INET; 
+    main_addr.sin_addr.s_addr = INADDR_ANY; 
+    main_addr.sin_port = htons(tcp_port); 
+    bind(main_socket, (struct sockaddr*)&main_addr, sizeof(main_addr)); 
+    
+    listen(main_socket, max_clients);
+
+    SOCKET http_socket = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in http_addr;
+    http_addr.sin_family = AF_INET;
+    http_addr.sin_addr.s_addr = INADDR_ANY;
+    http_addr.sin_port = htons(http_port); 
+    bind(http_socket, (struct sockaddr*)&http_addr, sizeof(http_addr));
+    listen(http_socket, 5);
+
+    cout << "SERVERI NE PUNE..." << endl;
+    cout << "TCP Port: " << tcp_port << " | HTTP Port: " << http_port << endl;
+   
+    while (true) {
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(main_socket, &read_fds);
+        FD_SET(http_socket, &read_fds);
+        
+        for (auto const& [id, c] : clients) FD_SET(id, &read_fds);
+
+        struct timeval tv = {1, 0};
+        select(0, &read_fds, NULL, NULL, &tv);
+      
 // HTTP setup
  // Check if there is an incoming HTTP request
 
