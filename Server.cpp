@@ -14,6 +14,41 @@
 
 #pragma comment(lib, "ws2_32.lib") 
 using namespace std;
+//leonis-pjesa 1
+const string server_ipAddres = "172.16.108.31"; 
+int tcp_port = 7777; 
+
+int http_port = 8080; 
+int max_clients = 6;  
+int timeout_seconds = 300; 
+
+struct Client {
+    SOCKET socket;
+    string ip;
+    time_t last_seen;
+    int requests;
+};
+
+struct MessageLog {
+    string ip;
+    string msg;
+    string time_str;
+};
+
+map<SOCKET, Client> clients;
+vector<MessageLog> messages_log; 
+SOCKET admin_client = INVALID_SOCKET; 
+
+string get_time_now() {
+    time_t now = time(0);
+    struct tm tstruct;
+    char buf[80];
+    localtime_s(&tstruct, &now);
+    strftime(buf, sizeof(buf), "%H:%M:%S", &tstruct);
+    return string(buf);
+}
+
+void handleHttpRequest(SOCKET http_socket);
 
 int main(){
 
