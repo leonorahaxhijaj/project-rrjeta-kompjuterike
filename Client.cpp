@@ -1,64 +1,57 @@
-#include <iostream> 
-#include <string>  
-#include <winsock2.h>  
-#include <ws2tcpip.h>  
-#include <fstream>  
-#include <vector> 
-#include <map>
-
-#pragma comment(lib, "ws2_32.lib")
-using namespace std;
-
 #include <iostream>
 #include <string>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <fstream>
-#include <vector>
-#include <map>
-#include <ctime>
+#include <sstream>
 
 #pragma comment(lib, "ws2_32.lib")
 using namespace std;
 
-int tcp_port = 7777;
-int max_clients = 6;
-
 int main() {
-    WSADATA data;
-    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
-        cout << "WSAStartup failed\n";
-        return 1;
-    }
 
-    SOCKET main_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (main_socket == INVALID_SOCKET) {
-        cout << "Socket creation failed\n";
-        return 1;
-    }
-
-    sockaddr_in main_addr{};
-    main_addr.sin_family = AF_INET;
-    main_addr.sin_addr.s_addr = INADDR_ANY;
-    main_addr.sin_port = htons(tcp_port);
-
-    if (bind(main_socket, (sockaddr*)&main_addr, sizeof(main_addr)) < 0) {
-        cout << "Bind failed\n";
-        return 1;
-    }
-
-    listen(main_socket, max_clients);
-
-    cout << "Serveri duke punuar ne portin " << tcp_port << endl;
-
+    string line;
     while (true) {
-        SOCKET client_socket = accept(main_socket, NULL, NULL);
-        if (client_socket != INVALID_SOCKET) {
-            cout << "Klient u lidh!" << endl;
+        cout << "Komanda: ";
+        getline(cin, line);
+        if (line == "exit") break;
+
+        string to_send = line;
+        if (line.find("/upload") == 0) {
+            size_t pos = line.find(' ');
+            if (pos != string::npos) {
+                string fn = line.substr(pos + 1);
+                ifstream f(fn);
+                if (f) {
+                    stringstream ss; ss << f.rdbuf();
+                    to_send = "/upload " + fn + " " + ss.str();
+                }
+            }
         }
+
+        int s = send(sock, to_send.c_str(), (int)to_send.length(), 0);
+
+        if (s == SOCKET_ERROR) {
+            cout << "Lidhja ka rene (Timeout). Duke u rilidhur automatikisht..." << endl;
+
+            closesocket(sock);
+            sock = socket(AF_INET, SOCK_STREAM, 0);
+
+            if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) != SOCKET_ERROR) {
+                cout << "Rilidhja e suksesshme!" << endl;
+                send(sock, to_send.c_str(), (int)to_send.length(), 0);
+            } else {
+                cout << "Serveri nuk po pergjigjet. Provo me vone." << endl;
+                continue;
+            }
+        }
+
+        char buf[4096] = {0};
+        int r = recv(sock, buf, 4096, 0);
+        if (r > 0) cout << "Serveri: " << buf << endl;
     }
 
-    closesocket(main_socket);
+    closesocket(sock);
     WSACleanup();
     return 0;
 }

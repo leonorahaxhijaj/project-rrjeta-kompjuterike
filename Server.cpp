@@ -14,7 +14,6 @@
 
 #pragma comment(lib, "ws2_32.lib") 
 using namespace std;
-//leonis-pjesa 1
 const string server_ipAddres = "172.16.108.31"; 
 int tcp_port = 7777; 
 
@@ -51,7 +50,6 @@ string get_time_now() {
 void handleHttpRequest(SOCKET http_socket);
 
 int main(){
-//leonis-pjesa 2
 
     WSADATA data; 
     WSAStartup(MAKEWORD(2, 2), &data); 
@@ -75,8 +73,7 @@ int main(){
 
     cout << "SERVERI NE PUNE..." << endl;
     cout << "TCP Port: " << tcp_port << " | HTTP Port: " << http_port << endl;
-    
-    //leonis-pjesa 3
+   
     while (true) {
         fd_set read_fds;
         FD_ZERO(&read_fds);
@@ -87,6 +84,46 @@ int main(){
 
         struct timeval tv = {1, 0};
         select(0, &read_fds, NULL, NULL, &tv);
+      
+// HTTP setup
+ // Check if there is an incoming HTTP request
+
+// Convert received buffer into a string message
+string input(buf);
+
+// Update client activity timestamp (last time seen online)
+it->second.last_seen = time(0);
+
+// Increase request counter for this client
+it->second.requests++;
+
+// Save message into log (limit message to 200 chars for safety/log size control)
+messages_log.push_back({
+    it->second.ip,
+    input.substr(0, 200),
+    get_time_now()
+});
+
+// Prepare response string (to be filled later based on command)
+string response = "";
+
+// Check if current client is admin
+bool is_admin = (id == admin_client);
+
+// If message starts with '/', treat it as a command
+if (input[0] == '/') {
+    stringstream ss(input);
+    string cmd, arg1, arg2;
+
+    // Extract command and first argument
+    ss >> cmd >> arg1;
+
+    // Read the rest of the line as second argument (if any)
+    getline(ss, arg2);
+
+    // Remove leading space from arg2 if it exists
+    if (!arg2.empty())
+        arg2 = arg2.substr(1);
 
     if (!is_admin && (cmd == "/upload" || cmd == "/delete" || cmd == "/download")) {
                         response = "GABIM: Ju nuk jeni Admin! Keni vetem read() permission.";
@@ -128,14 +165,39 @@ int main(){
                                 if (filename.find(keyword) != string::npos) {
                                     response += filename + " | ";
                                 }
-                            }
-                                    
+                            }       
                             if (response == "") {
                                 response = "Nuk u gjet asnje file qe permban: " + keyword;
                             } else {
                                 response = "Rezultatet e kerkimit: " + response;
                             }
-                        }
+                        } else if (cmd == "/info") {
+                            struct stat info;
+                            if (stat(arg1.c_str(), &info) == 0) {
+                                        
+                                struct tm tm_create;
+                                char create_time[80];
+                                localtime_s(&tm_create, &info.st_ctime);
+                                strftime(create_time, sizeof(create_time), "%d/%m/%Y %H:%M:%S", &tm_create);
+
+                                struct tm tm_mod;
+                                char mod_time[80];
+                                localtime_s(&tm_mod, &info.st_mtime);
+                                strftime(mod_time, sizeof(mod_time), "%d/%m/%Y %H:%M:%S", &tm_mod);
+
+                                response = "\n--- INFO PER: " + arg1 + " ---\n";
+                                response += "Madhesia: " + to_string(info.st_size) + " bytes\n";
+                                response += "Krijuar me: " + string(create_time) + "\n";
+                                response += "Modifikuar me: " + string(mod_time) + "\n";
+                                response += "--------------------------";
+                            } else {
+                                response = "GABIM: Skedari nuk u gjet.";
+                            }
+                        }else {
+                            response = "Komande e panjohur ose e paautorizuar.";
+                        } 
     }
+
+}
     return 0;
 }
