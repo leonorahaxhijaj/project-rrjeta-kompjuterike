@@ -75,6 +75,18 @@ int main(){
 
     cout << "SERVERI NE PUNE..." << endl;
     cout << "TCP Port: " << tcp_port << " | HTTP Port: " << http_port << endl;
+    
+    //leonis-pjesa 3
+    while (true) {
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(main_socket, &read_fds);
+        FD_SET(http_socket, &read_fds);
+        
+        for (auto const& [id, c] : clients) FD_SET(id, &read_fds);
+
+        struct timeval tv = {1, 0};
+        select(0, &read_fds, NULL, NULL, &tv);
 
     if (!is_admin && (cmd == "/upload" || cmd == "/delete" || cmd == "/download")) {
                         response = "GABIM: Ju nuk jeni Admin! Keni vetem read() permission.";
