@@ -12,6 +12,11 @@
 #include <filesystem>
 #include <sys/stat.h>
 
+#pragma comment(lib, "ws2_32.lib") 
+using namespace std;
+
+int main(){
+
 // HTTP setup
  // Check if there is an incoming HTTP request
 
@@ -51,11 +56,6 @@ if (input[0] == '/') {
     // Remove leading space from arg2 if it exists
     if (!arg2.empty())
         arg2 = arg2.substr(1);
-#pragma comment(lib, "ws2_32.lib") 
-using namespace std;
-
-int main(){
-
 
     if (!is_admin && (cmd == "/upload" || cmd == "/delete" || cmd == "/download")) {
                         response = "GABIM: Ju nuk jeni Admin! Keni vetem read() permission.";
@@ -129,5 +129,7 @@ int main(){
                             response = "Komande e panjohur ose e paautorizuar.";
                         } 
     }
+
+}
     return 0;
 }
