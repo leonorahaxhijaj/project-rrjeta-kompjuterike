@@ -14,34 +14,40 @@
 
 // HTTP setup
  // Check if there is an incoming HTTP request
-if (FD_ISSET(http_socket, &read_fds))
-    handleHttpRequest(http_socket);
 
-// Iterate through all connected clients
-for (auto it = clients.begin(); it != clients.end(); ) {
-    SOCKET id = it->first;
+// Convert received buffer into a string message
+string input(buf);
 
-    // Check if this client has sent data
-    if (FD_ISSET(id, &read_fds)) {
-        char buf[4096] = {0};
+// Update client activity timestamp (last time seen online)
+it->second.last_seen = time(0);
 
-        // Receive data from client
-        int r = recv(id, buf, 4096, 0);
+// Increase request counter for this client
+it->second.requests++;
 
-        // If connection is closed or error occurred
-        if (r <= 0) {
-            cout << "U shkeput: " << it->second.ip << endl;
+// Save message into log (limit message to 200 chars for safety/log size control)
+messages_log.push_back({
+    it->second.ip,
+    input.substr(0, 200),
+    get_time_now()
+});
 
-            // If admin disconnected, reset admin socket
-            if (admin_client == id)
-                admin_client = INVALID_SOCKET;
+// Prepare response string (to be filled later based on command)
+string response = "";
 
-            // Close socket and remove client from map
-            closesocket(id);
-            it = clients.erase(it);
-            continue;
-        }
+// Check if current client is admin
+bool is_admin = (id == admin_client);
 
-        // If client is NOT admin, apply delay (rate limiting / anti-spam)
-        if (id != admin_client)
-            Sleep(1500);
+// If message starts with '/', treat it as a command
+if (input[0] == '/') {
+    stringstream ss(input);
+    string cmd, arg1, arg2;
+
+    // Extract command and first argument
+    ss >> cmd >> arg1;
+
+    // Read the rest of the line as second argument (if any)
+    getline(ss, arg2);
+
+    // Remove leading space from arg2 if it exists
+    if (!arg2.empty())
+        arg2 = arg2.substr(1);
