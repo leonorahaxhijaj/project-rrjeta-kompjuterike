@@ -10,13 +10,13 @@
 #include <windows.h> 
 #include <sys/stat.h>
 #include <filesystem>
-#include <sys/stat.h>
 
 #pragma comment(lib, "ws2_32.lib") 
 using namespace std;
 
 const string server_ipAddres = "172.16.108.31"; 
 int tcp_port = 7777; 
+
 int http_port = 8080; 
 int max_clients = 6;  
 int timeout_seconds = 300; 
@@ -60,6 +60,7 @@ int main(){
     main_addr.sin_addr.s_addr = INADDR_ANY; 
     main_addr.sin_port = htons(tcp_port); 
     bind(main_socket, (struct sockaddr*)&main_addr, sizeof(main_addr)); 
+    
     listen(main_socket, max_clients);
 
     SOCKET http_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -84,7 +85,6 @@ int main(){
         struct timeval tv = {1, 0};
         select(0, &read_fds, NULL, NULL, &tv);
 
-        // LINDI PJESA 1
         if (FD_ISSET(main_socket, &read_fds)) {
             sockaddr_in addr; 
             int len = sizeof(addr);
@@ -108,10 +108,7 @@ int main(){
             }
         }
 
-        // LINDI PJESA 2
         if (FD_ISSET(http_socket, &read_fds)) handleHttpRequest(http_socket);
-
-        // LINDI PJESA 2 & 3
         for (auto it = clients.begin(); it != clients.end(); ) {
             SOCKET id = it->first;
             
@@ -129,97 +126,108 @@ int main(){
 
                 if (id != admin_client) Sleep(1500); 
 
-// YOUR ORIGINAL CODE CONTINUES
-string input(buf);
+                string input(buf);
+                it->second.last_seen = time(0);
+                it->second.requests++;
 
-it->second.last_seen = time(0);
-it->second.requests++;
+                messages_log.push_back({
+                    it->second.ip,
+                    input.substr(0, 200),
+                    get_time_now()
+                });
 
-messages_log.push_back({
-    it->second.ip,
-    input.substr(0, 200),
-    get_time_now()
-});
+                string response = "";
+                bool is_admin = (id == admin_client);
 
-string response = "";
-bool is_admin = (id == admin_client);
+                if (input[0] == '/') {
+                    stringstream ss(input);
+                    string cmd, arg1, arg2;
 
-if (input[0] == '/') {
-    stringstream ss(input);
-    string cmd, arg1, arg2;
+                    ss >> cmd >> arg1;
+                    getline(ss, arg2);
 
-    ss >> cmd >> arg1;
-    getline(ss, arg2);
+                    if (!arg2.empty())
+                        arg2 = arg2.substr(1);
 
-    if (!arg2.empty())
-        arg2 = arg2.substr(1);
+                    if (!is_admin && (cmd == "/upload" || cmd == "/delete" || cmd == "/download")) {
+                        response = "GABIM: Ju nuk jeni Admin! Keni vetem read() permission.";
+                    } else {
+                        if (cmd == "/list") {
+                            WIN32_FIND_DATAA f; HANDLE h = FindFirstFileA("*", &f);
+                            if (h != INVALID_HANDLE_VALUE) {
+                                do { 
+                                    response += string(f.cFileName) + " | "; 
+                                } while (FindNextFileA(h, &f));
+                                FindClose(h);
+                            }
+                        } else if (cmd == "/read") {
+                            ifstream f(arg1);
+                            if (f) { stringstream s; s << f.rdbuf(); response = s.str(); }
+                            else response = "File nuk u gjet.";
+                        } else if (cmd == "/upload") {
+                            ofstream f(arg1); f << arg2; response = "SUKSES: File u ngarkua.";
+                        } else if (cmd == "/delete") {
+                            response = (remove(arg1.c_str()) == 0) ? "SUKSES: File u fshi." : "GABIM: Fshirja deshtoi.";
+                        } else if (cmd == "/download") {
+                            ifstream file(arg1); 
+                            if (file) {
+                                stringstream buffer;
+                                buffer << file.rdbuf(); 
+                            } else {
+                                response = "GABIM: Skedari nuk ekziston ne Server.";
+                            }
+                        } else if (cmd == "/search") {
+                            string keyword = arg1; 
+                            response = "";
+                            for (const auto& entry : std::filesystem::directory_iterator(".")) {
+                                string filename = entry.path().filename().string();
+                                if (filename.find(keyword) != string::npos) {
+                                    response += filename + " | ";
+                                }
+                            }       
+                            if (response == "") {
+                                response = "Nuk u gjet asnje file qe permban: " + keyword;
+                            } else {
+                                response = "Rezultatet e kerkimit: " + response;
+                            }
+                        } else if (cmd == "/info") {
+                            struct stat info;
+                            if (stat(arg1.c_str(), &info) == 0) {
+                                        
+                                struct tm tm_create;
+                                char create_time[80];
+                                localtime_s(&tm_create, &info.st_ctime);
+                                strftime(create_time, sizeof(create_time), "%d/%m/%Y %H:%M:%S", &tm_create);
 
-    if (!is_admin && (cmd == "/upload" || cmd == "/delete" || cmd == "/download")) {
-        response = "GABIM: Ju nuk jeni Admin! Keni vetem read() permission.";
-    } else {
-        if (cmd == "/list") {
-            WIN32_FIND_DATAA f; HANDLE h = FindFirstFileA("*", &f);
-            if (h != INVALID_HANDLE_VALUE) {
-                do { 
-                    response += string(f.cFileName) + " | "; 
-                } while (FindNextFileA(h, &f));
-                FindClose(h);
-            }
-        } else if (cmd == "/read") {
-            ifstream f(arg1);
-            if (f) { stringstream s; s << f.rdbuf(); response = s.str(); }
-            else response = "File nuk u gjet.";
-        } else if (cmd == "/upload") {
-            ofstream f(arg1); f << arg2; response = "SUKSES: File u ngarkua.";
-        } else if (cmd == "/delete") {
-            response = (remove(arg1.c_str()) == 0) ? "SUKSES: File u fshi." : "GABIM: Fshirja deshtoi.";
-        } else if (cmd == "/download") {
-            ifstream file(arg1); 
-            if (file) {
-                stringstream buffer;
-                buffer << file.rdbuf(); 
-            } else {
-                response = "GABIM: Skedari nuk ekziston ne Server.";
-            }
-        } else if (cmd == "/search") {
-            string keyword = arg1; 
-            response = "";
-            for (const auto& entry : std::filesystem::directory_iterator(".")) {
-                string filename = entry.path().filename().string();
-                if (filename.find(keyword) != string::npos) {
-                    response += filename + " | ";
+                                struct tm tm_mod;
+                                char mod_time[80];
+                                localtime_s(&tm_mod, &info.st_mtime);
+                                strftime(mod_time, sizeof(mod_time), "%d/%m/%Y %H:%M:%S", &tm_mod);
+
+                                response = "\n--- INFO PER: " + arg1 + " ---\n";
+                                response += "Madhesia: " + to_string(info.st_size) + " bytes\n";
+                                response += "Krijuar me: " + string(create_time) + "\n";
+                                response += "Modifikuar me: " + string(mod_time) + "\n";
+                                response += "--------------------------";
+                            } else {
+                                response = "GABIM: Skedari nuk u gjet.";
+                            }
+                        } else {
+                            response = "Komande e panjohur ose e paautorizuar.";
+                        } 
+                    }
+
+                } else {
+                    response = is_admin ? "[ADMIN] Mesazhi u mor." : "[USER] Mesazhi u mor.";
                 }
-            }       
-            if (response == "") {
-                response = "Nuk u gjet asnje file qe permban: " + keyword;
-            } else {
-                response = "Rezultatet e kerkimit: " + response;
-            }
-        } else if (cmd == "/info") {
-            struct stat info;
-            if (stat(arg1.c_str(), &info) == 0) {
-                response = "Madhesia: " + to_string(info.st_size);
-            } else {
-                response = "GABIM: Skedari nuk u gjet.";
-            }
-        } else {
-            response = "Komande e panjohur ose e paautorizuar.";
-        } 
-    }
 
-} else {
-    response = is_admin ? "[ADMIN] Mesazhi u mor." : "[USER] Mesazhi u mor.";
-}
-
-// SEND (LINDI)
-string final_r = response + "\n";
-send(id, final_r.c_str(), (int)final_r.length(), 0);
+                string final_r = response + "\n";
+                send(id, final_r.c_str(), (int)final_r.length(), 0);
 
             }
             it++;
         }
 
-        // LINDI PJESA 4
         time_t now = time(0);
         for (auto it = clients.begin(); it != clients.end(); ) {
             if (now - it->second.last_seen > timeout_seconds) {
@@ -236,7 +244,6 @@ send(id, final_r.c_str(), (int)final_r.length(), 0);
     return 0;
 }
 
-// LINDI HTTP FUNCTION
 void handleHttpRequest(SOCKET http_socket) {
     SOCKET conn = accept(http_socket, NULL, NULL);
     char b[1024]; recv(conn, b, 1024, 0);
